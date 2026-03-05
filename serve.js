@@ -46,6 +46,6 @@ const server = http.createServer((req, res) => {
 });
 
 server.listen(PORT, () => {
-  console.log(`Vertex web server running at http://localhost:${PORT}`);
+  console.log(`Trimex web server running at http://localhost:${PORT}`);
   console.log('Make sure engine/world.js is running in another terminal.');
 });
