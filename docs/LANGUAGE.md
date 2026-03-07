@@ -1,6 +1,6 @@
-# Vertex Assembly Language (VASM)
+# Trimex Assembly Language (VASM)
 
-Programs in Vertex are sequences of instructions from a fixed set. Each program's genome is an ordered instruction list that executes cyclically.
+Programs in Trimex are sequences of instructions from a fixed set. Each program's genome is an ordered instruction list that executes cyclically.
 
 ## Instruction Set
 
