@@ -1,8 +1,8 @@
-# Vertex Architecture
+# Trimex Architecture
 
 ## Overview
 
-Vertex is a living simulation where autonomous programs compete for survival inside a virtual memory grid. The system has three layers: the simulation engine, the terminal UI, and the web frontend.
+Trimex is a living simulation where autonomous programs compete for survival inside a virtual memory grid. The system has three layers: the simulation engine, the terminal UI, and the web frontend.
 
 ```text
 engine/world.js -> world-state.json -> index.html
@@ -42,7 +42,7 @@ Renders the live grid in a terminal with species colors, population bars, top pr
 
 ### `index.html`
 
-Provides the Vertex web frontend: a canvas-based signal view with sidebar panels for agents, categories, and stories.
+Provides the Trimex web frontend: a canvas-based signal view with sidebar panels for agents, categories, and stories.
 
 ### `serve.js`
 
@@ -68,4 +68,4 @@ Serves the frontend and JSON files locally with a minimal Node.js HTTP server.
 
 ## Emergent Behavior
 
-Vertex has no scripted winner. Outcomes emerge from strategy conflicts, genetic drift, energy pressure, positioning, and random mutation. A stable early leader can collapse, while a small late-generation mutant can become the dominant survivor.
+Trimex has no scripted winner. Outcomes emerge from strategy conflicts, genetic drift, energy pressure, positioning, and random mutation. A stable early leader can collapse, while a small late-generation mutant can become the dominant survivor.
