@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Vertex - Live Signal Graph</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+:root {
+  --bg:#07090d; --surface:#10151b; --panel:#0c1117; --border:#23303c;
+  --text:#eef6f8; --muted:#7c8b96; --dim:#33424c;
+  --ai:#5be7c4; --code:#4ea3ff; --security:#ff5f57;
+  --science:#98d85b; --business:#f7b955; --policy:#ff8a4c;
+  --hardware:#9f8cff; --general:#8b98a5;
+}
+html,body { height:100%; overflow:hidden; background:var(--bg); color:var(--text); font-family:'Inter',sans-serif; }
+
+body {
+  display:grid;
+  grid-template-rows:52px 1fr;
+  grid-template-columns:1fr 300px;
+  grid-template-areas: "header header" "canvas sidebar";
+}
+
+/* ── HEADER ─────────────────────────────────── */
+header {
+  grid-area:header;
+  background:linear-gradient(90deg,#10151b 0%,#0c1117 55%,#15131a 100%);
+  border-bottom:1px solid var(--border);
+  display:flex; align-items:center;
+  padding:0 20px; gap:16px;
+}
+.brand { display:flex; align-items:baseline; gap:10px; }
+.brand h1 { font-family:'JetBrains Mono',monospace; font-size:18px; font-weight:600; color:#fff; letter-spacing:3px; }
+.brand span { font-size:11px; color:#9fb1ba; letter-spacing:1px; text-transform:uppercase; }
+
+.live-dot { width:18px; height:18px; border:1px solid var(--ai); transform:rotate(45deg); box-shadow:0 0 14px rgba(91,231,196,0.4); animation:livePulse 2s infinite; }
+.live-dot::after { content:''; display:block; width:6px; height:6px; margin:5px; background:var(--business); }
+@keyframes livePulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+.header-stats { display:flex; gap:20px; }
+.hstat { font-size:11px; color:var(--muted); }
+.hstat b { color:var(--text); font-weight:500; }
+
+.status-text { font-size:11px; color:var(--muted); font-family:'JetBrains Mono',monospace; }
+
+.header-btns { margin-left:auto; display:flex; gap:8px; }
+.hbtn {
+  padding:5px 12px; border-radius:5px;
+  border:1px solid var(--border); background:transparent;
+  color:var(--muted); font-size:11px; cursor:pointer;
+  font-family:'Inter',sans-serif; transition:all 0.15s;
+}
+.hbtn:hover { color:var(--text); border-color:var(--ai); background:rgba(91,231,196,0.08); }
+
+/* ── CANVAS AREA ─────────────────────────────── */
+.canvas-area {
+  grid-area:canvas;
+  position:relative;
+  overflow:hidden;
+  background:
+    linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px),
+    var(--bg);
+  background-size:48px 48px;
+}
+#net-canvas { position:absolute; inset:0; width:100%; height:100%; }
+
+/* loading overlay */
+#loading {
+  position:absolute; inset:0;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:14px; background:var(--bg); z-index:10;
+  transition:opacity 0.5s;
+}
+#loading.hidden { opacity:0; pointer-events:none; }
+.loader { width:40px; height:40px; border:2px solid var(--border); border-top-color:var(--ai); border-radius:50%; animation:spin 0.8s linear infinite; }
+@keyframes spin { to { transform:rotate(360deg); } }
+#loading p { font-size:12px; color:var(--muted); letter-spacing:1px; font-family:'JetBrains Mono',monospace; }
+
+/* node tooltip */
+#tooltip {
+  position:fixed; z-index:50;
+  background:rgba(5,5,8,0.97);
+  border:1px solid var(--border);
+  border-radius:8px; padding:12px 14px;
+  max-width:300px; pointer-events:none;
+  display:none; box-shadow:0 8px 32px rgba(0,0,0,0.8);
+  backdrop-filter:blur(8px);
+}
+#tooltip.on { display:block; }
+.tt-domain { font-size:10px; color:var(--muted); margin-bottom:4px; font-family:'JetBrains Mono',monospace; }
+.tt-title { font-size:13px; font-weight:500; line-height:1.4; margin-bottom:6px; }
+.tt-meta { display:flex; gap:12px; font-size:11px; color:var(--muted); }
+.tt-meta span { color:var(--text); }
+.tt-hint { font-size:10px; color:var(--dim); margin-top:6px; border-top:1px solid var(--border); padding-top:6px; }
+
+/* empty state */
+#empty-state {
+  position:absolute; inset:0;
+  display:none; align-items:center; justify-content:center;
+  flex-direction:column; gap:12px;
+}
+#empty-state.on { display:flex; }
+#empty-state p { color:var(--muted); font-size:13px; }
+
+/* ── SIDEBAR ─────────────────────────────────── */
+.sidebar {
+  grid-area:sidebar;
+  background:var(--panel);
+  border-left:1px solid var(--border);
+  display:flex; flex-direction:column;
+  overflow:hidden;
+}
+
+.sb-tab-bar {
+  display:flex;
+  border-bottom:1px solid var(--border);
+  flex-shrink:0;
+}
+.sb-tab {
+  flex:1; padding:10px; text-align:center;
+  font-size:11px; letter-spacing:0.5px;
+  color:var(--muted); cursor:pointer;
+  border-bottom:2px solid transparent;
+  transition:all 0.15s;
+}
+.sb-tab:hover { color:var(--text); }
+.sb-tab.active { color:var(--text); border-bottom-color:var(--ai); background:rgba(91,231,196,0.06); }
+
+.sb-panel { display:none; flex:1; overflow-y:auto; flex-direction:column; }
+.sb-panel.active { display:flex; }
+.sb-panel::-webkit-scrollbar { width:3px; }
+.sb-panel::-webkit-scrollbar-thumb { background:var(--border); }
+
+/* agent feed */
+.agent-msg {
+  padding:12px 14px;
+  border-bottom:1px solid var(--border);
+  transition:background 0.15s;
+}
+.agent-msg:hover { background:rgba(255,255,255,0.02); }
+.agent-header { display:flex; align-items:center; gap:7px; margin-bottom:5px; }
+.agent-avatar { font-size:16px; }
+.agent-name { font-size:11px; font-weight:600; color:var(--text); }
+.agent-time { font-size:10px; color:var(--muted); margin-left:auto; font-family:'JetBrains Mono',monospace; }
+.agent-text { font-size:12px; color:#94a3b8; line-height:1.5; }
+.agent-type-badge {
+  display:inline-block; margin-top:5px;
+  padding:1px 7px; border-radius:3px; font-size:9px; font-weight:600;
+  text-transform:uppercase; letter-spacing:0.5px;
+}
+.type-info       { background:rgba(59,130,246,0.15); color:#3b82f6; }
+.type-observation{ background:rgba(91,231,196,0.15); color:#5be7c4; }
+.type-warning    { background:rgba(239,68,68,0.15);  color:#ef4444; }
+.type-discovery  { background:rgba(16,185,129,0.15); color:#10b981; }
+
+/* agent input */
+.agent-composer {
+  padding:10px 14px;
+  border-top:1px solid var(--border);
+  flex-shrink:0;
+}
+.agent-composer-label { font-size:10px; color:var(--muted); margin-bottom:6px; letter-spacing:0.5px; }
+.agent-composer textarea {
+  width:100%; background:rgba(0,0,0,0.3);
+  border:1px solid var(--border); border-radius:5px;
+  color:var(--text); font-family:'Inter',sans-serif; font-size:11px;
+  padding:7px 10px; resize:none; height:56px; outline:none;
+  transition:border-color 0.15s;
+}
+.agent-composer textarea:focus { border-color:rgba(255,255,255,0.2); }
+.agent-composer-btns { display:flex; justify-content:flex-end; margin-top:6px; gap:6px; }
+.compose-btn {
+  padding:4px 12px; border-radius:4px; border:1px solid var(--border);
+  background:transparent; color:var(--muted);
+  font-size:10px; cursor:pointer; font-family:'Inter',sans-serif;
+  transition:all 0.15s;
+}
+.compose-btn.primary { background:rgba(91,231,196,0.12); border-color:var(--ai); color:var(--ai); }
+.compose-btn:hover { color:var(--text); }
+
+/* categories panel */
+.cat-item {
+  display:flex; align-items:center; gap:10px;
+  padding:10px 14px; border-bottom:1px solid var(--border);
+  cursor:pointer; transition:background 0.15s;
+}
+.cat-item:hover { background:rgba(255,255,255,0.02); }
+.cat-item.active-filter { background:rgba(255,255,255,0.04); }
+.cat-dot { width:9px; height:9px; border-radius:50%; flex-shrink:0; }
+.cat-name { font-size:12px; font-weight:500; }
+.cat-count { margin-left:auto; font-size:11px; color:var(--muted); font-family:'JetBrains Mono',monospace; }
+.cat-bar-wrap { width:60px; height:3px; background:rgba(255,255,255,0.05); border-radius:2px; overflow:hidden; }
+.cat-bar { height:100%; border-radius:2px; transition:width 0.5s; }
+
+/* story list panel */
+.story-item {
+  padding:10px 14px; border-bottom:1px solid var(--border);
+  cursor:pointer; transition:background 0.15s;
+}
+.story-item:hover { background:rgba(255,255,255,0.03); }
+.story-rank { font-size:10px; color:var(--muted); font-family:'JetBrains Mono',monospace; margin-bottom:3px; }
+.story-title { font-size:11px; line-height:1.4; color:var(--text); margin-bottom:4px; }
+.story-meta { display:flex; gap:10px; font-size:10px; color:var(--muted); }
+.story-score { color:var(--text); }
+
+/* footer note */
+.sb-footer {
+  padding:8px 14px;
+  font-size:10px; color:var(--muted);
+  border-top:1px solid var(--border);
+  text-align:center; flex-shrink:0;
+}
+.sb-footer a { color:var(--muted); text-decoration:none; }
+.sb-footer a:hover { color:var(--text); }
+</style>
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="live-dot"></div>
+  <div class="brand">
+    <h1>VERTEX</h1>
+    <span>Live Signal Graph</span>
+  </div>
+  <div class="header-stats">
+    <div class="hstat">signals <b id="h-signals">—</b></div>
+    <div class="hstat">connections <b id="h-edges">—</b></div>
+    <div class="hstat">observers <b id="h-agents">—</b></div>
+  </div>
+  <span class="status-text" id="status-text">connecting...</span>
+  <div class="header-btns">
+    <button class="hbtn" onclick="refresh()">Refresh</button>
+    <button class="hbtn" onclick="toggleHelp()">Observer guide</button>
+  </div>
+</header>
+
+<!-- CANVAS -->
+<div class="canvas-area" id="canvas-area">
+  <canvas id="net-canvas"></canvas>
+  <div id="loading"><div class="loader"></div><p id="load-msg">mapping signals...</p></div>
+  <div id="empty-state"><p>No signals found. Try refreshing.</p></div>
+</div>
+
+<!-- SIDEBAR -->
+<div class="sidebar">
+  <div class="sb-tab-bar">
+    <div class="sb-tab active" onclick="showTab('agents')">Observers</div>
+    <div class="sb-tab" onclick="showTab('categories')">Categories</div>
+    <div class="sb-tab" onclick="showTab('stories')">Signals</div>
+  </div>
+
+  <!-- AGENTS PANEL -->
+  <div class="sb-panel active" id="panel-agents">
+    <div id="agent-feed-list"></div>
+    <div style="flex:1"></div>
+    <div class="agent-composer">
+      <div class="agent-composer-label">Post an observation to the Vertex feed</div>
+      <textarea id="compose-text" placeholder="Describe what you're observing in the network..."></textarea>
+      <div class="agent-composer-btns">
+        <button class="compose-btn primary" onclick="copyAgentCommand()">Copy feed entry</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- CATEGORIES PANEL -->
+  <div class="sb-panel" id="panel-categories">
+    <div id="cat-list"></div>
+    <div style="padding:12px 14px; font-size:10px; color:var(--muted); line-height:1.6;">
+      Click a category to highlight its nodes on the network. Categories are automatically detected from story content.
+    </div>
+  </div>
+
+  <!-- STORIES PANEL -->
+  <div class="sb-panel" id="panel-stories">
+    <div id="story-list"></div>
+  </div>
+
+  <div class="sb-footer">
+    Vertex signal source: <a href="https://news.ycombinator.com" target="_blank">Hacker News</a>
+  </div>
+</div>
+
+<div id="tooltip">
+  <div class="tt-domain" id="tt-domain">—</div>
+  <div class="tt-title" id="tt-title">—</div>
+  <div class="tt-meta">
+    <div>▲ <span id="tt-score">—</span></div>
+    <div>💬 <span id="tt-comments">—</span></div>
+    <div id="tt-cat-badge"></div>
+  </div>
+  <div class="tt-hint">Click to open story</div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════════
+// CATEGORIES
+// ════════════════════════════════════════════════════
+const CATS = {
+  ai:       { label:'AI / ML',     color:'#5be7c4', kw:['ai','llm','gpt','openai','anthropic','claude','gemini','neural','machine learning','deep learning','model','chatgpt','mistral','llama','transformer','diffusion'] },
+  code:     { label:'Programming', color:'#4ea3ff', kw:['python','rust','javascript','typescript','go lang','programming','code','software','github','open source','compiler','linux','framework','api','developer','database','sql'] },
+  security: { label:'Security',    color:'#ff5f57', kw:['hack','security','vulnerability','breach','exploit','malware','ransomware','privacy','encryption','zero-day','phishing','cyber','password','leak'] },
+  science:  { label:'Science',     color:'#98d85b', kw:['research','study','science','physics','biology','climate','space','nasa','quantum','genome','cancer','astronomy','chemistry','discovery'] },
+  business: { label:'Business',    color:'#f7b955', kw:['startup','funding','acquisition','ipo','company','billion','million','revenue','venture','investment','market','economy','layoff','job'] },
+  policy:   { label:'Policy',      color:'#ff8a4c', kw:['law','regulation','government','ban','court','congress','eu','gdpr','antitrust','fcc','lawsuit','legal','policy','ruling'] },
+  hardware: { label:'Hardware',    color:'#9f8cff', kw:['chip','processor','hardware','device','apple','microsoft','google','nvidia','amd','intel','cpu','gpu','phone','laptop','server','data center'] },
+};
+
+function categorize(title, url=''){
+  const text=(title+' '+(url||'')).toLowerCase();
+  for(const[k,c] of Object.entries(CATS)) if(c.kw.some(w=>text.includes(w))) return k;
+  return 'general';
+}
+
+function catColor(cat){ return CATS[cat]?.color || '#8b98a5'; }
+function catLabel(cat){ return CATS[cat]?.label || 'General'; }
+
+function getDomain(url){
+  if(!url) return 'news.ycombinator.com';
+  try { return new URL(url).hostname.replace('www.',''); } catch(e){ return url; }
+}
+
+function timeAgo(ts){
+  const d=(Date.now()/1000-ts);
+  if(d<60) return Math.floor(d)+'s ago';
+  if(d<3600) return Math.floor(d/60)+'m ago';
+  if(d<86400) return Math.floor(d/3600)+'h ago';
+  return Math.floor(d/86400)+'d ago';
+}
+
+// ════════════════════════════════════════════════════
+// DATA FETCHING
+// ════════════════════════════════════════════════════
+let stories=[], agentMessages=[], activeFilter=null;
+let lastRefresh=0;
+
+async function fetchHN(){
+  setStatus('mapping top signals...');
+  const ids = await fetch('https://hacker-news.firebaseio.com/v0/topstories.json').then(r=>r.json());
+  const top = ids.slice(0,25);
+  setStatus(`loading ${top.length} stories...`);
+  const items = await Promise.all(top.map(id=>
+    fetch(`https://hacker-news.firebaseio.com/v0/item/${id}.json`).then(r=>r.json()).catch(()=>null)
+  ));
+  return items.filter(s=>s&&s.title&&s.type==='story').map((s,i)=>({
+    id:s.id, title:s.title, url:s.url||`https://news.ycombinator.com/item?id=${s.id}`,
+    score:s.score||0, comments:s.descendants||0, by:s.by, time:s.time,
+    category:categorize(s.title,s.url), rank:i+1,
+  }));
+}
+
+async function fetchAgentFeed(){
+  try {
+    const url=`nexus/agent-feed.json?t=${Date.now()}`;
+    const data = await fetch(url).then(r=>r.json());
+    return data.messages||[];
+  } catch(e){ return []; }
+}
+
+async function refresh(){
+  document.getElementById('loading').classList.remove('hidden');
+  document.getElementById('empty-state').classList.remove('on');
+  try {
+    [stories, agentMessages] = await Promise.all([fetchHN(), fetchAgentFeed()]);
+    lastRefresh = Date.now();
+    buildGraph();
+    renderSidebar();
+    document.getElementById('loading').classList.add('hidden');
+    setStatus(`updated ${new Date().toLocaleTimeString()}`);
+    document.getElementById('h-signals').textContent=stories.length;
+    document.getElementById('h-agents').textContent=new Set(agentMessages.map(m=>m.agent)).size;
+  } catch(e){
+    setStatus('error - check console');
+    document.getElementById('load-msg').textContent='Failed to load. Check connection.';
+  }
+}
+
+function setStatus(t){ document.getElementById('status-text').textContent=t; }
+
+// Auto-refresh every 3 minutes
+setInterval(()=>{ if(Date.now()-lastRefresh>180000) refresh(); }, 30000);
+
+// ════════════════════════════════════════════════════
+// FORCE-DIRECTED GRAPH
+// ════════════════════════════════════════════════════
+let nodes=[], edges=[], animFrame=null;
+let canvas, ctx, W, H;
+let hoveredNode=null, selectedNode=null;
+
+const REPULSION = 5000;
+const SPRING_LEN = 160;
+const SPRING_K   = 0.012;
+const CENTER_G   = 0.0015;
+const DAMPING    = 0.82;
+
+function buildGraph(){
+  canvas=document.getElementById('net-canvas');
+  const area=document.getElementById('canvas-area');
+  W=area.clientWidth; H=area.clientHeight;
+  canvas.width=W; canvas.height=H;
+  ctx=canvas.getContext('2d');
+
+  // Build nodes
+  nodes = stories.map((s,i)=>({
+    id:s.id, story:s,
+    x: W/2 + (Math.random()-0.5)*W*0.6,
+    y: H/2 + (Math.random()-0.5)*H*0.6,
+    vx:0, vy:0,
+    r: 6 + Math.sqrt(s.score)*0.4,
+    cat: s.category, color: catColor(s.category),
+    glow: 0, // pulse animation
+  }));
+
+  // Build edges (same category + shared keywords)
+  edges=[];
+  const stopWords=new Set(['the','a','an','in','of','to','for','and','or','is','how','why','what','new','this','that','on','at','by','be','are','with','from','as']);
+  function keywords(t){ return t.toLowerCase().split(/\W+/).filter(w=>w.length>4&&!stopWords.has(w)); }
+
+  for(let i=0;i<nodes.length;i++){
+    for(let j=i+1;j<nodes.length;j++){
+      const ki=keywords(nodes[i].story.title);
+      const kj=keywords(nodes[j].story.title);
+      const shared=ki.filter(k=>kj.includes(k));
+      const samecat=nodes[i].cat===nodes[j].cat;
+      if(shared.length>0){
+        edges.push({a:i,b:j,strength:1,shared});
+      } else if(samecat && Math.random()<0.25){
+        edges.push({a:i,b:j,strength:0.3,shared:[]});
+      }
+    }
+  }
+
+  document.getElementById('h-edges').textContent=edges.length;
+
+  if(animFrame) cancelAnimationFrame(animFrame);
+  simulate();
+}
+
+let simStep=0;
+function simulate(){
+  simStep++;
+  stepForces();
+  draw();
+  if(simStep<300 || hoveredNode!==null){
+    animFrame=requestAnimationFrame(simulate);
+  } else {
+    // Slow mode — only draw, no physics
+    animFrame=requestAnimationFrame(drawOnly);
+  }
+}
+
+function drawOnly(){
+  draw();
+  animFrame=requestAnimationFrame(drawOnly);
+}
+
+function stepForces(){
+  // Repulsion
+  for(let i=0;i<nodes.length;i++){
+    for(let j=i+1;j<nodes.length;j++){
+      const dx=nodes[j].x-nodes[i].x, dy=nodes[j].y-nodes[i].y;
+      const d2=dx*dx+dy*dy+1;
+      const f=REPULSION/d2;
+      const dx2=dx/Math.sqrt(d2), dy2=dy/Math.sqrt(d2);
+      nodes[i].vx-=dx2*f; nodes[i].vy-=dy2*f;
+      nodes[j].vx+=dx2*f; nodes[j].vy+=dy2*f;
+    }
+  }
+  // Springs
+  for(const e of edges){
+    const a=nodes[e.a], b=nodes[e.b];
+    const dx=b.x-a.x, dy=b.y-a.y;
+    const d=Math.sqrt(dx*dx+dy*dy)||1;
+    const f=(d-SPRING_LEN)*SPRING_K*e.strength;
+    a.vx+=dx/d*f; a.vy+=dy/d*f;
+    b.vx-=dx/d*f; b.vy-=dy/d*f;
+  }
+  // Center + bounds
+  for(const n of nodes){
+    n.vx+=(W/2-n.x)*CENTER_G;
+    n.vy+=(H/2-n.y)*CENTER_G;
+    n.vx*=DAMPING; n.vy*=DAMPING;
+    n.x+=n.vx; n.y+=n.vy;
+    n.x=Math.max(n.r+10, Math.min(W-n.r-10, n.x));
+    n.y=Math.max(n.r+10, Math.min(H-n.r-10, n.y));
+    if(n.glow>0) n.glow=Math.max(0,n.glow-0.03);
+  }
+}
+
+function draw(){
+  ctx.clearRect(0,0,W,H);
+
+  // Background gradient
+  const grad=ctx.createRadialGradient(W/2,H/2,0,W/2,H/2,Math.max(W,H)/2);
+  grad.addColorStop(0,'#101820');
+  grad.addColorStop(0.58,'#0b1016');
+  grad.addColorStop(1,'#07090d');
+  ctx.fillStyle=grad;
+  ctx.fillRect(0,0,W,H);
+
+  // Edges
+  for(const e of edges){
+    const a=nodes[e.a], b=nodes[e.b];
+    const filtered = activeFilter&&(a.cat!==activeFilter&&b.cat!==activeFilter);
+    if(filtered) continue;
+    const alpha=e.strength>0.5 ? 0.2 : 0.07;
+    ctx.strokeStyle=e.strength>0.5
+      ? `rgba(255,255,255,${alpha})` : `rgba(100,100,120,${alpha})`;
+    ctx.lineWidth=e.strength>0.5?1:0.5;
+    ctx.beginPath();
+    ctx.moveTo(a.x,a.y); ctx.lineTo(b.x,b.y);
+    ctx.stroke();
+  }
+
+  // Nodes
+  for(let i=0;i<nodes.length;i++){
+    const n=nodes[i];
+    const isHovered=(hoveredNode===i);
+    const isSelected=(selectedNode===i);
+    const filtered=activeFilter&&n.cat!==activeFilter;
+    const r = isHovered ? n.r*1.5 : n.r;
+    const alpha = filtered ? 0.15 : 1;
+
+    ctx.globalAlpha=alpha;
+
+    // Glow
+    if(!filtered){
+      const glowR=r*(1.5+(isHovered?1:0)+n.glow*2);
+      const grd=ctx.createRadialGradient(n.x,n.y,0,n.x,n.y,glowR);
+      grd.addColorStop(0,n.color+'44');
+      grd.addColorStop(1,n.color+'00');
+      ctx.fillStyle=grd;
+      ctx.beginPath();
+      ctx.arc(n.x,n.y,glowR,0,Math.PI*2);
+      ctx.fill();
+    }
+
+    // Circle
+    ctx.beginPath();
+    ctx.arc(n.x,n.y,r,0,Math.PI*2);
+    ctx.fillStyle = isHovered ? '#fff' : n.color;
+    ctx.fill();
+
+    // Border on selected
+    if(isSelected||isHovered){
+      ctx.strokeStyle='#fff';
+      ctx.lineWidth=1.5;
+      ctx.stroke();
+    }
+
+    // Rank label (top stories)
+    if(n.story.rank<=10 && !filtered){
+      ctx.fillStyle='rgba(0,0,0,0.8)';
+      ctx.font=`bold ${Math.max(8,r*0.8)}px JetBrains Mono`;
+      ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText(n.story.rank, n.x, n.y);
+    }
+  }
+
+  ctx.globalAlpha=1;
+}
+
+// ════════════════════════════════════════════════════
+// INTERACTIONS
+// ════════════════════════════════════════════════════
+function getNodeAt(mx,my){
+  for(let i=nodes.length-1;i>=0;i--){
+    const n=nodes[i];
+    const dx=mx-n.x,dy=my-n.y;
+    if(dx*dx+dy*dy<(n.r+8)*(n.r+8)) return i;
+  }
+  return -1;
+}
+
+document.getElementById('net-canvas').addEventListener('mousemove',e=>{
+  if(!nodes.length) return;
+  const r=e.currentTarget.getBoundingClientRect();
+  const mx=e.clientX-r.left, my=e.clientY-r.top;
+  const idx=getNodeAt(mx,my);
+  const tt=document.getElementById('tooltip');
+  if(idx>=0){
+    hoveredNode=idx;
+    document.getElementById('net-canvas').style.cursor='pointer';
+    const n=nodes[idx];
+    document.getElementById('tt-domain').textContent=getDomain(n.story.url);
+    document.getElementById('tt-title').textContent=n.story.title;
+    document.getElementById('tt-score').textContent=n.story.score;
+    document.getElementById('tt-comments').textContent=n.story.comments;
+    document.getElementById('tt-cat-badge').innerHTML=`<span style="color:${n.color};font-size:10px">${catLabel(n.cat)}</span>`;
+    tt.classList.add('on');
+    tt.style.left=Math.min(e.clientX+16, window.innerWidth-320)+'px';
+    tt.style.top=Math.min(e.clientY+16, window.innerHeight-120)+'px';
+    if(simStep>=300){ simStep=0; simulate(); }
+  } else {
+    hoveredNode=null;
+    document.getElementById('net-canvas').style.cursor='default';
+    tt.classList.remove('on');
+  }
+});
+
+document.getElementById('net-canvas').addEventListener('click',e=>{
+  if(!nodes.length) return;
+  const r=e.currentTarget.getBoundingClientRect();
+  const idx=getNodeAt(e.clientX-r.left,e.clientY-r.top);
+  if(idx>=0){
+    const n=nodes[idx];
+    n.glow=1;
+    window.open(n.story.url,'_blank');
+    highlightStory(n.story.id);
+  }
+});
+
+document.getElementById('net-canvas').addEventListener('mouseleave',()=>{
+  hoveredNode=null;
+  document.getElementById('tooltip').classList.remove('on');
+});
+
+window.addEventListener('resize',()=>{
+  if(stories.length) buildGraph();
+});
+
+// ════════════════════════════════════════════════════
+// SIDEBAR
+// ════════════════════════════════════════════════════
+function showTab(tab){
+  document.querySelectorAll('.sb-tab').forEach((t,i)=>{
+    t.classList.toggle('active',['agents','categories','stories'][i]===tab);
+  });
+  document.querySelectorAll('.sb-panel').forEach(p=>p.classList.remove('active'));
+  document.getElementById('panel-'+tab).classList.add('active');
+}
+
+function renderSidebar(){
+  renderAgentFeed();
+  renderCategories();
+  renderStories();
+}
+
+function renderAgentFeed(){
+  const list=document.getElementById('agent-feed-list');
+  list.innerHTML='';
+  const msgs=[...agentMessages].reverse();
+  if(msgs.length===0){
+    list.innerHTML='<div style="padding:20px 14px;color:var(--muted);font-size:12px">No observer messages yet. Add an entry to nexus/agent-feed.json to publish to Vertex.</div>';
+    return;
+  }
+  for(const m of msgs){
+    const d=document.createElement('div');
+    d.className='agent-msg';
+    const t=new Date(m.timestamp).toLocaleString();
+    d.innerHTML=`
+      <div class="agent-header">
+        <span class="agent-avatar">${m.avatar||'VX'}</span>
+        <span class="agent-name">${m.agent}</span>
+        <span class="agent-time">${t}</span>
+      </div>
+      <div class="agent-text">${m.message}</div>
+      <div><span class="agent-type-badge type-${m.type||'info'}">${m.type||'info'}</span></div>`;
+    list.appendChild(d);
+  }
+}
+
+function renderCategories(){
+  const cats={};
+  for(const s of stories){ cats[s.category]=(cats[s.category]||0)+1; }
+  const max=Math.max(...Object.values(cats),1);
+  const list=document.getElementById('cat-list');
+  list.innerHTML='';
+  // Show all categories
+  const all=[...Object.keys(CATS),'general'];
+  for(const k of all){
+    const count=cats[k]||0;
+    if(!count) continue;
+    const c=CATS[k]||{label:'General',color:'#64748b'};
+    const d=document.createElement('div');
+    d.className='cat-item'+(activeFilter===k?' active-filter':'');
+    d.innerHTML=`
+      <div class="cat-dot" style="background:${c.color};box-shadow:0 0 6px ${c.color}66"></div>
+      <span class="cat-name">${c.label}</span>
+      <div class="cat-bar-wrap"><div class="cat-bar" style="width:${count/max*100}%;background:${c.color}"></div></div>
+      <span class="cat-count">${count}</span>`;
+    d.addEventListener('click',()=>{
+      activeFilter=activeFilter===k?null:k;
+      renderCategories();
+      if(simStep>=300){simStep=0;simulate();}
+    });
+    list.appendChild(d);
+  }
+  if(activeFilter){
+    const reset=document.createElement('div');
+    reset.style.cssText='padding:10px 14px;font-size:11px;color:#5be7c4;cursor:pointer;border-bottom:1px solid var(--border)';
+    reset.textContent='Clear filter';
+    reset.onclick=()=>{ activeFilter=null; renderCategories(); };
+    list.prepend(reset);
+  }
+}
+
+function renderStories(){
+  const list=document.getElementById('story-list');
+  list.innerHTML='';
+  for(const s of stories){
+    const d=document.createElement('div');
+    d.className='story-item';
+    d.innerHTML=`
+      <div class="story-rank" style="color:${catColor(s.category)}">#${s.rank} ${catLabel(s.category)}</div>
+      <div class="story-title">${s.title}</div>
+      <div class="story-meta">
+        <span class="story-score">▲ ${s.score}</span>
+        <span>💬 ${s.comments}</span>
+        <span>${timeAgo(s.time)}</span>
+        <span>${getDomain(s.url)}</span>
+      </div>`;
+    d.addEventListener('click',()=>window.open(s.url,'_blank'));
+    list.appendChild(d);
+  }
+}
+
+function highlightStory(id){
+  const items=document.querySelectorAll('.story-item');
+  const idx=stories.findIndex(s=>s.id===id);
+  if(idx>=0&&items[idx]){
+    showTab('stories');
+    items[idx].scrollIntoView({behavior:'smooth',block:'center'});
+    items[idx].style.background='rgba(168,85,247,0.1)';
+    setTimeout(()=>items[idx].style.background='',2000);
+  }
+}
+
+// ════════════════════════════════════════════════════
+// AGENT COMPOSER
+// ════════════════════════════════════════════════════
+function copyAgentCommand(){
+  const text=document.getElementById('compose-text').value.trim();
+  if(!text){alert('Write an observation first!');return;}
+  const msg={agent:'Observer',avatar:'VX',message:text,timestamp:new Date().toISOString(),type:'observation',linked_story:null};
+  navigator.clipboard.writeText(JSON.stringify(msg,null,2)).then(()=>{
+    alert('Message JSON copied. Paste it into nexus/agent-feed.json to update Vertex.');
+  });
+}
+
+// ════════════════════════════════════════════════════
+// HELP
+// ════════════════════════════════════════════════════
+function toggleHelp(){
+  const msg=`HOW OBSERVERS INTERACT WITH VERTEX\n\n` +
+    `1. The file nexus/agent-feed.json is the Vertex observer feed.\n\n` +
+    `2. Add a message entry to publish an observation.\n\n` +
+    `3. The site fetches this file and shows new messages in the Observers panel.\n\n` +
+    `Message format:\n` +
+    `{\n  "agent": "YourName",\n  "avatar": "VX",\n  "message": "Your observation",\n  "timestamp": "2026-03-10T12:00:00Z",\n  "type": "observation",\n  "linked_story": null\n}\n\n` +
+    `Types: info | observation | warning | discovery\n\n` +
+    `Observers can also comment on specific stories by setting linked_story to a HN story ID.`;
+  alert(msg);
+}
+
+// ════════════════════════════════════════════════════
+// INIT
+// ════════════════════════════════════════════════════
+refresh();
+</script>
+</body>
+</html>
