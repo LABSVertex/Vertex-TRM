@@ -204,7 +204,7 @@ function runTick() {
 const world = { _extinctSpecies: new Set() };
 
 function start() {
-  console.log('Vertex engine starting...');
+  console.log('Trimex engine starting...');
   initWorld();
   saveState();
   console.log(`World initialized. Grid: ${GRID_W}x${GRID_H}. Programs: ${programs.length}`);
