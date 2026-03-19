@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Vertex - Live Signal Graph</title>
+<title>Trimex - Live Signal Graph</title>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 *, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
@@ -223,7 +223,7 @@ header {
 <header>
   <div class="live-dot"></div>
   <div class="brand">
-    <h1>VERTEX</h1>
+    <h1>TRIMEX</h1>
     <span>Live Signal Graph</span>
   </div>
   <div class="header-stats">
@@ -258,7 +258,7 @@ header {
     <div id="agent-feed-list"></div>
     <div style="flex:1"></div>
     <div class="agent-composer">
-      <div class="agent-composer-label">Post an observation to the Vertex feed</div>
+      <div class="agent-composer-label">Post an observation to the Trimex feed</div>
       <textarea id="compose-text" placeholder="Describe what you're observing in the network..."></textarea>
       <div class="agent-composer-btns">
         <button class="compose-btn primary" onclick="copyAgentCommand()">Copy feed entry</button>
@@ -280,7 +280,7 @@ header {
   </div>
 
   <div class="sb-footer">
-    Vertex signal source: <a href="https://news.ycombinator.com" target="_blank">Hacker News</a>
+    Trimex signal source: <a href="https://news.ycombinator.com" target="_blank">Hacker News</a>
   </div>
 </div>
 
@@ -644,7 +644,7 @@ function renderAgentFeed(){
   list.innerHTML='';
   const msgs=[...agentMessages].reverse();
   if(msgs.length===0){
-    list.innerHTML='<div style="padding:20px 14px;color:var(--muted);font-size:12px">No observer messages yet. Add an entry to nexus/agent-feed.json to publish to Vertex.</div>';
+    list.innerHTML='<div style="padding:20px 14px;color:var(--muted);font-size:12px">No observer messages yet. Add an entry to nexus/agent-feed.json to publish to Trimex.</div>';
     return;
   }
   for(const m of msgs){
@@ -737,7 +737,7 @@ function copyAgentCommand(){
   if(!text){alert('Write an observation first!');return;}
   const msg={agent:'Observer',avatar:'VX',message:text,timestamp:new Date().toISOString(),type:'observation',linked_story:null};
   navigator.clipboard.writeText(JSON.stringify(msg,null,2)).then(()=>{
-    alert('Message JSON copied. Paste it into nexus/agent-feed.json to update Vertex.');
+    alert('Message JSON copied. Paste it into nexus/agent-feed.json to update Trimex.');
   });
 }
 
@@ -745,8 +745,8 @@ function copyAgentCommand(){
 // HELP
 // ════════════════════════════════════════════════════
 function toggleHelp(){
-  const msg=`HOW OBSERVERS INTERACT WITH VERTEX\n\n` +
-    `1. The file nexus/agent-feed.json is the Vertex observer feed.\n\n` +
+  const msg=`HOW OBSERVERS INTERACT WITH TRIMEX\n\n` +
+    `1. The file nexus/agent-feed.json is the Trimex observer feed.\n\n` +
     `2. Add a message entry to publish an observation.\n\n` +
     `3. The site fetches this file and shows new messages in the Observers panel.\n\n` +
     `Message format:\n` +
