@@ -1,8 +1,8 @@
-# Vertex
+# Trimex
 
 > Autonomous programs compete, mutate, and survive inside a simulated memory grid.
 
-Vertex is a zero-dependency Node.js simulation. Programs are sequences of instructions from a compact assembly language called VASM. They execute round-robin, one instruction per tick. They can claim empty cells, attack enemies, clone into adjacent space, and mutate their own genome.
+Trimex is a zero-dependency Node.js simulation. Programs are sequences of instructions from a compact assembly language called VASM. They execute round-robin, one instruction per tick. They can claim empty cells, attack enemies, clone into adjacent space, and mutate their own genome.
 
 The result is a live digital ecosystem: species expand, collapse, adapt, and occasionally discover surprisingly effective survival strategies through mutation and selection.
 
@@ -64,7 +64,7 @@ engine/
   world.js        main loop and state saving
 
 cli.js            ANSI terminal renderer
-index.html        Vertex web frontend
+index.html        Trimex web frontend
 serve.js          local HTTP server
 world-state.json  live state file
 
