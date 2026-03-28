@@ -1,4 +1,4 @@
-// cli.js - ANSI terminal UI for Vertex
+// cli.js - ANSI terminal UI for Trimex
 // Run: node cli.js (while engine/world.js is running in another terminal)
 
 const fs = require('fs');
@@ -63,7 +63,7 @@ function renderSidebar(state, height) {
   const lines = [];
 
   // Title
-  lines.push(`${BOLD}${rgb(91, 231, 196)} VERTEX ${RESET}`);
+  lines.push(`${BOLD}${rgb(91, 231, 196)} TRIMEX ${RESET}`);
   lines.push(`${DIM}tick ${state.tick} | programs: ${state.totalPrograms}${RESET}`);
   lines.push(`${DIM}kills: ${state.totalKills} | extinct: ${state.extinctions}${RESET}`);
   lines.push('');
@@ -115,7 +115,7 @@ function render(state) {
   let output = CLEAR;
 
   // Header
-  output += `${BOLD}${rgb(91,231,196)}== VERTEX == autonomous programs evolving in memory ==${RESET}\n`;
+  output += `${BOLD}${rgb(91,231,196)}== TRIMEX == autonomous programs evolving in memory ==${RESET}\n`;
 
   // Grid + sidebar side by side
   const totalLines = Math.max(gridLines.length, sidebarLines.length);
@@ -149,7 +149,7 @@ process.stdout.write('\x1b[?25l');
 // Restore cursor on exit
 process.on('SIGINT', () => {
   process.stdout.write('\x1b[?25h\x1b[2J\x1b[H');
-  console.log('Vertex CLI exited.');
+  console.log('Trimex CLI exited.');
   process.exit(0);
 });
 
